@@ -1,0 +1,60 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract DecentralisedLending {
+    struct Loan {
+        uint amount;
+        uint interest;
+
+        uint dueDate;
+        address borrower;
+        bool repaid;
+    }
+
+    address public owner;
+    uint public loanCounter;
+    mapping(uint => Loan) public loans;
+
+    event LoanRequested(uint indexed loanId, address indexed borrower, uint amount, uint interest, uint dueDate);
+    event LoanRepaid(uint indexed loanId, address indexed borrower, uint amount);
+
+    constructor() {
+        owner = msg.sender;
+        loanCounter = 0;
+    }
+
+    function requestLoan(uint _interest, uint _dueDateInDays) external payable {
+        require(msg.value > 0, "Loan amount must be greater than zero");
+        loanCounter++;
+        loans[loanCounter] = Loan({
+            amount: msg.value,
+            interest: _interest,
+            dueDate: block.timestamp + (_dueDateInDays * 1 days),
+            borrower: msg.sender,
+            repaid: false
+        });
+
+        emit LoanRequested(loanCounter, msg.sender, msg.value, _interest, block.timestamp + (_dueDateInDays * 1 days));
+    }
+
+    function repayLoan(uint _loanId) external payable {
+        Loan storage loan = loans[_loanId];
+        require(msg.sender == loan.borrower, "Only borrower can repay");
+        require(!loan.repaid, "Loan already repaid");
+        require(block.timestamp <= loan.dueDate, "Loan is overdue");
+
+        uint totalRepayAmount = loan.amount + (loan.amount * loan.interest / 100);
+        require(msg.value >= totalRepayAmount, "Insufficient repayment amount");
+
+        loan.repaid = true;
+        payable(owner).transfer(totalRepayAmount);
+
+        emit LoanRepaid(_loanId, msg.sender, msg.value);
+    }
+
+    function getLoanDetails(uint _loanId) public view returns (Loan memory) {
+        return loans[_loanId];
+    }
+}
+
+0xC5F7E16Fa68F78768E6ee9E53A143b0639c18734
